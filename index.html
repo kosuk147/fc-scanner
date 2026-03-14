@@ -417,7 +417,7 @@
   <div id="setup-screen">
     <div class="setup-section">
       <div class="setup-label">GAS WebアプリURL <span style="color:#ef4444">*必須</span></div>
-      <input class="setup-input" type="url" id="gas-url" placeholder="https://script.google.com/macros/s/..." />
+      <input class="setup-input" type="url" id="gas-url" placeholder="https://script.google.com/macros/s/..." value="https://script.google.com/macros/s/AKfycbxIIlDVouQpWN_mwRR4w9jZd3Wd567ZO_i67hOMEGdmzVNVZacQm-UfwM1QKXi9Ss9j/exec" />
       <div class="gas-hint">GASをデプロイして取得したURLを貼り付けてください</div>
     </div>
     <div class="setup-section">
@@ -484,7 +484,7 @@
 </div>
 
 <script>
-let GAS_URL = '';
+let GAS_URL = 'https://script.google.com/macros/s/AKfycbxIIlDVouQpWN_mwRR4w9jZd3Wd567ZO_i67hOMEGdmzVNVZacQm-UfwM1QKXi9Ss9j/exec';
 let STAFF_NAME = '';
 let EVENT_NAME = '';
 let scanning = true;
@@ -584,6 +584,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const savedStaff = localStorage.getItem('fc_staff_name');
   const savedEvent = localStorage.getItem('fc_event_name');
   if (savedUrl) document.getElementById('gas-url').value = savedUrl;
+  else document.getElementById('gas-url').value = 'https://script.google.com/macros/s/AKfycbxIIlDVouQpWN_mwRR4w9jZd3Wd567ZO_i67hOMEGdmzVNVZacQm-UfwM1QKXi9Ss9j/exec';
   if (savedStaff) document.getElementById('staff-name').value = savedStaff;
   if (savedEvent) document.getElementById('event-name').value = savedEvent;
 
