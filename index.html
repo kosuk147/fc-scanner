@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>FC入場スキャナー</title>
-<!-- ZXing: QR＋バーコード両対応 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -22,94 +21,392 @@
     --ng: #ef4444;
     --ng-bg: #2d0a0a;
     --ng-glow: rgba(239,68,68,0.35);
+    --warn: #f59e0b;
     --text: #e2e0f0;
     --muted: #7070a0;
-    --font: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif;
+    --font-head: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif;
   }
 
-  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
-  #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-head);
+    overflow: hidden;
+  }
 
-  /* HEADER */
-  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-  .logo { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-  .header-title { font-size: 15px; font-weight: 700; }
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .header-title { font-size: 15px; font-weight: 700; letter-spacing: 0.03em; }
   .header-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-left: auto; flex-shrink: 0; transition: background 0.3s; }
-  .status-dot.ready { background: var(--ok); box-shadow: 0 0 6px var(--ok); animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    margin-left: auto;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .status-dot.ready { background: var(--ok); box-shadow: 0 0 6px var(--ok); animation: pulse-dot 2s infinite; }
 
-  /* SETUP */
-  #setup-screen { flex: 1; overflow-y: auto; padding: 20px 16px; }
-  .setup-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
-  .setup-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
-  .setup-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font); font-size: 14px; padding: 10px 12px; outline: none; transition: border-color 0.2s; }
-  .setup-input:focus { border-color: var(--accent); }
-  .setup-input::placeholder { color: var(--muted); }
-  .gas-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
-  .start-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 12px; color: #fff; font-family: var(--font); font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: opacity 0.2s, transform 0.1s; }
-  .start-btn:active { opacity: 0.85; transform: scale(0.98); }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
 
-  /* SCANNER */
+  #setup-screen {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+  }
+
+  .setup-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .setup-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .setup-input,
+  .manual-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--font-head);
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .setup-input:focus,
+  .manual-input:focus { border-color: var(--accent); }
+  .setup-input::placeholder,
+  .manual-input::placeholder { color: var(--muted); }
+
+  .gas-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  .start-btn,
+  .manual-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-family: var(--font-head);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .start-btn:active,
+  .manual-btn:active { opacity: 0.85; transform: scale(0.98); }
+
   #scanner-screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
-  .camera-wrap { position: relative; flex-shrink: 0; background: #000; overflow: hidden; }
-  #video { width: 100%; display: block; max-height: 55vw; object-fit: cover; }
 
-  .scan-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-  .scan-frame { width: 200px; height: 130px; position: relative; }
-  .scan-frame::before, .scan-frame::after, .scan-frame span::before, .scan-frame span::after { content: ''; position: absolute; width: 24px; height: 24px; border-color: var(--accent2); border-style: solid; }
-  .scan-frame::before  { top:0; left:0; border-width:3px 0 0 3px; border-radius:4px 0 0 0; }
-  .scan-frame::after   { top:0; right:0; border-width:3px 3px 0 0; border-radius:0 4px 0 0; }
-  .scan-frame span::before { bottom:0; left:0; border-width:0 0 3px 3px; border-radius:0 0 0 4px; }
-  .scan-frame span::after  { bottom:0; right:0; border-width:0 3px 3px 0; border-radius:0 0 4px 0; }
-  .scan-line { position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: sweep 2s ease-in-out infinite; box-shadow: 0 0 8px var(--accent); }
-  @keyframes sweep { 0%{top:5%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:95%;opacity:0} }
+  .camera-wrap {
+    position: relative;
+    flex-shrink: 0;
+    background: #000;
+    overflow: hidden;
+    min-height: 280px;
+  }
+  #video {
+    width: 100%;
+    height: min(58vw, 340px);
+    display: block;
+    object-fit: cover;
+    background: #000;
+  }
+  #canvas-hidden { display: none; }
 
-  /* RESULT */
-  .result-area { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-  .result-banner { padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 130px; justify-content: center; transition: background 0.3s; }
+  .scan-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .scan-frame {
+    width: min(76vw, 300px);
+    height: min(48vw, 190px);
+    position: relative;
+  }
+  .scan-frame::before, .scan-frame::after,
+  .scan-frame span::before, .scan-frame span::after {
+    content: '';
+    position: absolute;
+    width: 28px; height: 28px;
+    border-color: var(--accent2);
+    border-style: solid;
+  }
+  .scan-frame::before  { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+  .scan-frame::after   { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+  .scan-frame span::before { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+  .scan-frame span::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+  .scan-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scan-sweep 2s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  @keyframes scan-sweep {
+    0%   { top: 10%; opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { top: 90%; opacity: 0; }
+  }
+
+  .scanner-tip {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    background: rgba(10,10,18,0.72);
+    border: 1px solid rgba(167,139,250,0.3);
+    color: #fff;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .result-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .result-banner {
+    padding: 20px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.3s, box-shadow 0.3s;
+    min-height: 128px;
+    justify-content: center;
+  }
   .result-banner.idle { background: var(--surface2); }
-  .result-banner.ok-state { background: var(--ok-bg); box-shadow: inset 0 -2px 24px var(--ok-glow); animation: flash 0.35s ease; }
-  .result-banner.ng-state { background: var(--ng-bg); box-shadow: inset 0 -2px 24px var(--ng-glow); animation: flash 0.35s ease; }
-  @keyframes flash { 0%{filter:brightness(3)} 100%{filter:brightness(1)} }
-  .result-icon { font-size: 44px; line-height: 1; }
-  .result-verdict { font-size: 36px; font-weight: 900; letter-spacing: 0.06em; }
-  .result-verdict.ok { color: var(--ok); text-shadow: 0 0 20px var(--ok-glow); }
-  .result-verdict.ng { color: var(--ng); text-shadow: 0 0 20px var(--ng-glow); }
-  .result-verdict.idle { font-size: 13px; font-weight: 400; color: var(--muted); }
-  .result-member-id { font-size: 17px; font-weight: 700; word-break: break-all; text-align: center; }
-  .result-message { font-size: 13px; color: var(--muted); text-align: center; }
+  .result-banner.ok-state {
+    background: var(--ok-bg);
+    box-shadow: inset 0 -2px 24px var(--ok-glow);
+    animation: flash-ok 0.4s ease;
+  }
+  .result-banner.ng-state {
+    background: var(--ng-bg);
+    box-shadow: inset 0 -2px 24px var(--ng-glow);
+    animation: flash-ng 0.4s ease;
+  }
+  .result-banner.warn-state {
+    background: rgba(245, 158, 11, 0.12);
+    box-shadow: inset 0 -2px 24px rgba(245, 158, 11, 0.2);
+  }
+  @keyframes flash-ok {
+    0% { background: #fff; }
+    100% { background: var(--ok-bg); }
+  }
+  @keyframes flash-ng {
+    0% { background: #fff; }
+    100% { background: var(--ng-bg); }
+  }
 
-  /* HISTORY */
-  .history-section { padding: 12px 16px; flex: 1; }
-  .history-title { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
-  .history-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 6px; animation: slide-in 0.25s ease; }
-  @keyframes slide-in { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-  .badge { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
-  .badge.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
-  .badge.ng { background: var(--ng-bg); color: var(--ng); border: 1px solid var(--ng); }
-  .badge.sent { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
-  .h-id { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .h-time { color: var(--muted); flex-shrink: 0; }
+  .result-icon { font-size: 48px; line-height: 1; }
+  .result-verdict {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+  }
+  .result-verdict.ok { color: var(--ok); text-shadow: 0 0 16px var(--ok-glow); }
+  .result-verdict.ng { color: var(--ng); text-shadow: 0 0 16px var(--ng-glow); }
+  .result-verdict.warn { color: var(--warn); }
+  .result-verdict.idle { color: var(--muted); font-size: 14px; font-weight: 400; letter-spacing: 0.02em; }
 
-  /* BOTTOM */
-  .bottom-bar { background: var(--surface); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-  .bottom-info { font-size: 11px; color: var(--muted); }
+  .result-member-id {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    word-break: break-all;
+    text-align: center;
+  }
+  .result-message {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .manual-section {
+    padding: 12px 16px 0;
+  }
+  .manual-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .manual-row .manual-input { flex: 1; }
+  .manual-row .manual-btn {
+    width: auto;
+    margin-top: 0;
+    padding: 10px 14px;
+    font-size: 13px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .manual-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  .history-section {
+    padding: 12px 16px;
+    flex: 1;
+  }
+  .history-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    animation: slide-in 0.25s ease;
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .history-badge {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+  .history-badge.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .history-badge.ng { background: var(--ng-bg); color: var(--ng); border: 1px solid var(--ng); }
+  .history-badge.error,
+  .history-badge.warn,
+  .history-badge.idle { background: rgba(245,158,11,0.1); color: var(--warn); border: 1px solid rgba(245,158,11,0.5); }
+  .history-id { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-time { color: var(--muted); flex-shrink: 0; }
+
+  .bottom-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    gap: 10px;
+  }
+  .bottom-info { font-size: 11px; color: var(--muted); line-height: 1.6; }
   .bottom-info strong { color: var(--text); }
-  .settings-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-family: var(--font); font-size: 12px; padding: 6px 12px; cursor: pointer; }
+  .settings-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-family: var(--font-head);
+    font-size: 12px;
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
 
-  /* LOADING */
-  #loading { display: none; position: fixed; inset: 0; background: rgba(10,10,18,0.8); z-index: 100; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
-  #loading.show { display: flex; }
-  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
-  @keyframes spin { to{transform:rotate(360deg)} }
+  #loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,18,0.8);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+  }
+  #loading-overlay.show { display: flex; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .loading-text { font-size: 14px; color: var(--muted); }
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="logo">🎫</div>
+    <div class="logo-mark">🎫</div>
     <div>
       <div class="header-title">FC入場スキャナー</div>
       <div class="header-sub" id="header-sub">設定してください</div>
@@ -117,7 +414,6 @@
     <div class="status-dot" id="status-dot"></div>
   </header>
 
-  <!-- SETUP SCREEN -->
   <div id="setup-screen">
     <div class="setup-section">
       <div class="setup-label">GAS WebアプリURL <span style="color:#ef4444">*必須</span></div>
@@ -130,253 +426,382 @@
     </div>
     <div class="setup-section">
       <div class="setup-label">イベント名（任意）</div>
-      <input class="setup-input" type="text" id="event-name" placeholder="例：2025年春イベント" />
+      <input class="setup-input" type="text" id="event-name" placeholder="例：2026春イベント" />
     </div>
-    <button class="start-btn" onclick="startScanner()">📷 スキャン開始</button>
+    <button class="start-btn" id="start-btn" onclick="startScanner()">📷 スキャン開始</button>
   </div>
 
-  <!-- SCANNER SCREEN -->
   <div id="scanner-screen">
     <div class="camera-wrap">
       <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas-hidden"></canvas>
       <div class="scan-overlay">
-        <div class="scan-frame"><span></span><div class="scan-line"></div></div>
+        <div class="scan-frame">
+          <span></span>
+          <div class="scan-line"></div>
+        </div>
       </div>
+      <div class="scanner-tip">コード全体が枠内に入るようにかざしてください</div>
     </div>
+
     <div class="result-area">
       <div class="result-banner idle" id="result-banner">
         <div class="result-icon" id="result-icon">📷</div>
         <div class="result-verdict idle" id="result-verdict">会員証をかざしてください</div>
         <div class="result-member-id" id="result-member-id"></div>
-        <div class="result-message" id="result-msg"></div>
+        <div class="result-message" id="result-message"></div>
       </div>
+
+      <div class="manual-section">
+        <div class="manual-row">
+          <input class="manual-input" id="manual-member-id" type="text" placeholder="読めない場合は会員IDを手入力" />
+          <button class="manual-btn" onclick="submitManual()">送信</button>
+        </div>
+        <div class="manual-hint">QRが読みにくい場合は手入力でも判定できます</div>
+      </div>
+
       <div class="history-section">
         <div class="history-title">📋 本日のスキャン履歴</div>
-        <div id="history-list">
+        <div class="history-list" id="history-list">
           <div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">まだスキャンがありません</div>
         </div>
       </div>
     </div>
+
     <div class="bottom-bar">
-      <div class="bottom-info">スタッフ: <strong id="disp-staff">-</strong> ／ イベント: <strong id="disp-event">-</strong></div>
-      <button class="settings-btn" onclick="goSetup()">⚙ 設定</button>
+      <div class="bottom-info">
+        スタッフ: <strong id="display-staff">-</strong><br>
+        イベント: <strong id="display-event">-</strong>
+      </div>
+      <button class="settings-btn" onclick="goToSetup()">⚙ 設定</button>
     </div>
   </div>
 </div>
 
-<div id="loading"><div class="spinner"></div><div class="loading-text">送信中...</div></div>
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">送信中...</div>
+</div>
 
 <script>
-let GAS_URL = '', STAFF = '', EVENT = '';
+let GAS_URL = '';
+let STAFF_NAME = '';
+let EVENT_NAME = '';
+let scanning = true;
 let cooldown = false;
-let codeReader = null;
+let stream = null;
 let scanHistory = [];
+let animFrame = null;
+let lastDetectedText = '';
+let lastDetectedAt = 0;
+const DUPLICATE_SUPPRESS_MS = 1500;
+const RESULT_RESET_MS = 2200;
 
-// ============================================================
-// SETUP → SCANNER
-// ============================================================
-async function startScanner() {
-  const url = document.getElementById('gas-url').value.trim();
-  if (!url) { alert('GAS WebアプリURLを入力してください'); return; }
-
-  GAS_URL = url;
-  STAFF   = document.getElementById('staff-name').value.trim() || 'スタッフ';
-  EVENT   = document.getElementById('event-name').value.trim() || 'イベント';
-
-  localStorage.setItem('fc_url',   GAS_URL);
-  localStorage.setItem('fc_staff', STAFF);
-  localStorage.setItem('fc_event', EVENT);
-
-  document.getElementById('header-sub').textContent  = EVENT;
-  document.getElementById('disp-staff').textContent  = STAFF;
-  document.getElementById('disp-event').textContent  = EVENT;
-  document.getElementById('setup-screen').style.display  = 'none';
-  document.getElementById('scanner-screen').style.display = 'flex';
-  document.getElementById('status-dot').classList.add('ready');
-
-  initZXing();
+function updateStatusMessage(message) {
+  document.getElementById('result-message').textContent = message || '';
 }
 
-function goSetup() {
-  if (codeReader) { try { codeReader.reset(); } catch(e){} codeReader = null; }
+async function startScanner() {
+  const url   = document.getElementById('gas-url').value.trim();
+  const staff = document.getElementById('staff-name').value.trim();
+  const event = document.getElementById('event-name').value.trim();
+
+  if (!url) {
+    alert('GAS WebアプリURLを入力してください');
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('このブラウザはカメラ読取に対応していません。Chrome / Safari の最新版をお試しください。');
+    return;
+  }
+
+  GAS_URL = url;
+  STAFF_NAME = staff || 'スタッフ';
+  EVENT_NAME = event || 'イベント';
+
+  localStorage.setItem('fc_gas_url', GAS_URL);
+  localStorage.setItem('fc_staff_name', STAFF_NAME);
+  localStorage.setItem('fc_event_name', EVENT_NAME);
+
+  try {
+    stopScannerStream();
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      },
+      audio: false
+    });
+
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    await video.play();
+
+    await new Promise(resolve => {
+      if (video.readyState >= 2) return resolve();
+      video.onloadedmetadata = () => resolve();
+    });
+
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('scanner-screen').style.display = 'flex';
+    document.getElementById('header-sub').textContent = EVENT_NAME;
+    document.getElementById('display-staff').textContent = STAFF_NAME;
+    document.getElementById('display-event').textContent = EVENT_NAME;
+    document.getElementById('status-dot').classList.add('ready');
+
+    resetResult();
+    updateStatusMessage('カメラ準備OK。QRコード全体を枠内に入れてください');
+
+    if (animFrame) cancelAnimationFrame(animFrame);
+    animFrame = requestAnimationFrame(scanLoop);
+  } catch (err) {
+    alert('カメラを開始できませんでした。\nブラウザでカメラ権限を許可して再度お試しください。\n\n詳細: ' + err.message);
+  }
+}
+
+function stopScannerStream() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+}
+
+function goToSetup() {
+  stopScannerStream();
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame = null;
   document.getElementById('scanner-screen').style.display = 'none';
-  document.getElementById('setup-screen').style.display   = 'block';
+  document.getElementById('setup-screen').style.display = 'block';
   document.getElementById('status-dot').classList.remove('ready');
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const u = localStorage.getItem('fc_url');
-  const s = localStorage.getItem('fc_staff');
-  const e = localStorage.getItem('fc_event');
-  if (u) document.getElementById('gas-url').value    = u;
-  if (s) document.getElementById('staff-name').value = s;
-  if (e) document.getElementById('event-name').value = e;
+  const savedUrl = localStorage.getItem('fc_gas_url');
+  const savedStaff = localStorage.getItem('fc_staff_name');
+  const savedEvent = localStorage.getItem('fc_event_name');
+  if (savedUrl) document.getElementById('gas-url').value = savedUrl;
+  if (savedStaff) document.getElementById('staff-name').value = savedStaff;
+  if (savedEvent) document.getElementById('event-name').value = savedEvent;
+
+  document.getElementById('manual-member-id').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitManual();
+  });
 });
 
-// ============================================================
-// ZXing（QR＋バーコード全対応）
-// ============================================================
-function initZXing() {
-  if (typeof ZXing === 'undefined') {
-    alert('スキャンライブラリの読み込みに失敗しました。\nページを再読み込みしてください。');
-    goSetup();
-    return;
+function scanLoop() {
+  animFrame = requestAnimationFrame(scanLoop);
+  if (!scanning || cooldown) return;
+
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas-hidden');
+  if (!video.videoWidth || !video.videoHeight || video.readyState < 2) return;
+
+  const targetWidth = 800;
+  const scale = Math.min(1, targetWidth / video.videoWidth);
+  const drawWidth = Math.max(320, Math.floor(video.videoWidth * scale));
+  const drawHeight = Math.max(240, Math.floor(video.videoHeight * scale));
+
+  canvas.width = drawWidth;
+  canvas.height = drawHeight;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, drawWidth, drawHeight);
+
+  let detected = tryReadQrFromCanvas(ctx, drawWidth, drawHeight, true);
+  if (!detected) {
+    detected = tryReadQrFromCanvas(ctx, drawWidth, drawHeight, false);
   }
 
-  const hints = new Map();
-  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-    ZXing.BarcodeFormat.QR_CODE,
-    ZXing.BarcodeFormat.EAN_13,
-    ZXing.BarcodeFormat.EAN_8,
-    ZXing.BarcodeFormat.CODE_128,
-    ZXing.BarcodeFormat.CODE_39,
-    ZXing.BarcodeFormat.CODE_93,
-    ZXing.BarcodeFormat.ITF,
-    ZXing.BarcodeFormat.DATA_MATRIX,
-    ZXing.BarcodeFormat.PDF_417,
-    ZXing.BarcodeFormat.AZTEC,
-    ZXing.BarcodeFormat.UPC_A,
-    ZXing.BarcodeFormat.UPC_E,
-  ]);
-  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  if (detected && detected.data) {
+    handleDetectedCode(detected.data);
+  }
+}
 
-  codeReader = new ZXing.BrowserMultiFormatReader(hints, 200);
+function tryReadQrFromCanvas(ctx, width, height, cropCenter) {
+  let sx = 0, sy = 0, sw = width, sh = height;
 
-  codeReader.decodeFromConstraints(
-    {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width:  { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    },
-    'video',
-    (result, err) => {
-      if (result && !cooldown) {
-        handleScan(result.getText());
-      }
-      // errはスキャン中は毎フレーム発生するため無視
-    }
-  ).catch(err => {
-    console.error('Camera error:', err);
-    alert('カメラへのアクセスが許可されていません。\nブラウザの設定でカメラを許可してください。');
-    goSetup();
+  if (cropCenter) {
+    sw = Math.floor(width * 0.78);
+    sh = Math.floor(height * 0.62);
+    sx = Math.floor((width - sw) / 2);
+    sy = Math.floor((height - sh) / 2);
+  }
+
+  const imageData = ctx.getImageData(sx, sy, sw, sh);
+  return jsQR(imageData.data, imageData.width, imageData.height, {
+    inversionAttempts: 'attemptBoth'
   });
 }
 
-// ============================================================
-// スキャン → GAS送信
-// ============================================================
-async function handleScan(memberId) {
+function handleDetectedCode(rawValue) {
+  const memberId = String(rawValue || '').trim();
+  if (!memberId) return;
+
+  const now = Date.now();
+  if (memberId === lastDetectedText && (now - lastDetectedAt) < DUPLICATE_SUPPRESS_MS) {
+    return;
+  }
+  lastDetectedText = memberId;
+  lastDetectedAt = now;
+
+  submitScan(memberId);
+}
+
+function submitManual() {
+  const input = document.getElementById('manual-member-id');
+  const memberId = String(input.value || '').trim();
+  if (!memberId) {
+    showResult('WARN', '', '会員IDを入力してください');
+    return;
+  }
+  input.value = '';
+  submitScan(memberId);
+}
+
+async function submitScan(memberId) {
   if (cooldown) return;
   cooldown = true;
-  playBeep('detect');
   showLoading(true);
 
-  const body = JSON.stringify({ memberId, staffName: STAFF, eventName: EVENT });
-
   try {
-    // まずCORSで試みる
-    const res = await fetch(GAS_URL, {
+    const payload = {
+      memberId,
+      staffName: STAFF_NAME,
+      eventName: EVENT_NAME
+    };
+
+    const response = await fetch(GAS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    showResult(data.result, memberId, data.message || '');
-    addHistory(data.result, memberId);
-    playBeep(data.result === 'OK' ? 'ok' : 'ng');
-  } catch(e) {
-    // no-corsフォールバック（GASのCORS制限対応）
+
+    const rawText = await response.text();
+    let data = {};
     try {
-      await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body });
-      showResult('SENT', memberId, '送信完了 — スプレッドシートで結果を確認');
-      addHistory('SENT', memberId);
-      playBeep('ok');
-    } catch(e2) {
-      showResult('ERROR', memberId, '通信エラー。URLを確認してください');
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (parseErr) {
+      throw new Error('GASのレスポンスをJSONとして読めませんでした。WebアプリURLかデプロイ設定を確認してください。');
     }
+
+    const result = data.result || 'ERROR';
+    const message = data.message || '';
+
+    showResult(result, memberId, message);
+    addHistory(result, memberId);
+
+    if (result === 'OK') {
+      playBeep(true);
+    } else if (result === 'NG') {
+      playBeep(false);
+    }
+  } catch (err) {
+    showResult('ERROR', memberId, '通信エラー: ' + err.message);
+    addHistory('ERROR', memberId);
   } finally {
     showLoading(false);
-    setTimeout(() => { cooldown = false; resetResult(); }, 3000);
+    setTimeout(() => {
+      cooldown = false;
+      resetResult();
+    }, RESULT_RESET_MS);
   }
 }
 
-// ============================================================
-// UI ヘルパー
-// ============================================================
 function showResult(result, memberId, message) {
-  const banner  = document.getElementById('result-banner');
-  const icon    = document.getElementById('result-icon');
+  const banner = document.getElementById('result-banner');
+  const icon = document.getElementById('result-icon');
   const verdict = document.getElementById('result-verdict');
+  const idEl = document.getElementById('result-member-id');
+  const msgEl = document.getElementById('result-message');
+
   banner.className = 'result-banner';
 
   if (result === 'OK') {
     banner.classList.add('ok-state');
-    icon.textContent = '✅'; verdict.className = 'result-verdict ok'; verdict.textContent = 'OK';
+    icon.textContent = '✅';
+    verdict.className = 'result-verdict ok';
+    verdict.textContent = 'OK';
   } else if (result === 'NG') {
     banner.classList.add('ng-state');
-    icon.textContent = '🚫'; verdict.className = 'result-verdict ng'; verdict.textContent = 'NG';
+    icon.textContent = '🚫';
+    verdict.className = 'result-verdict ng';
+    verdict.textContent = 'NG';
+  } else if (result === 'WARN') {
+    banner.classList.add('warn-state');
+    icon.textContent = '⚠️';
+    verdict.className = 'result-verdict warn';
+    verdict.textContent = '入力確認';
   } else {
-    banner.classList.add('idle');
-    icon.textContent = result === 'SENT' ? '📤' : '⚠️';
-    verdict.className = 'result-verdict idle';
-    verdict.textContent = result === 'SENT' ? '送信完了' : 'エラー';
+    banner.classList.add('warn-state');
+    icon.textContent = '⚠️';
+    verdict.className = 'result-verdict warn';
+    verdict.textContent = 'ERROR';
   }
-  document.getElementById('result-member-id').textContent = memberId ? `会員ID: ${memberId}` : '';
-  document.getElementById('result-msg').textContent = message;
+
+  idEl.textContent = memberId ? `会員ID: ${memberId}` : '';
+  msgEl.textContent = message || '';
 }
 
 function resetResult() {
-  document.getElementById('result-banner').className = 'result-banner idle';
+  const banner = document.getElementById('result-banner');
+  banner.className = 'result-banner idle';
   document.getElementById('result-icon').textContent = '📷';
-  const v = document.getElementById('result-verdict');
-  v.className = 'result-verdict idle'; v.textContent = '会員証をかざしてください';
+  const verdict = document.getElementById('result-verdict');
+  verdict.className = 'result-verdict idle';
+  verdict.textContent = '会員証をかざしてください';
   document.getElementById('result-member-id').textContent = '';
-  document.getElementById('result-msg').textContent = '';
+  document.getElementById('result-message').textContent = '';
 }
 
 function addHistory(result, memberId) {
-  const time = new Date().toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-  scanHistory.unshift({ result, memberId, time });
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  scanHistory.unshift({ result, memberId, time: timeStr });
   if (scanHistory.length > 20) scanHistory.pop();
-  const cls = result === 'NG' ? 'ng' : result === 'SENT' ? 'sent' : 'ok';
-  document.getElementById('history-list').innerHTML = scanHistory.map(h => {
-    const c = h.result === 'NG' ? 'ng' : h.result === 'SENT' ? 'sent' : 'ok';
-    return `<div class="history-item">
-      <span class="badge ${c}">${h.result}</span>
-      <span class="h-id">${h.memberId}</span>
-      <span class="h-time">${h.time}</span>
-    </div>`;
+
+  const list = document.getElementById('history-list');
+  list.innerHTML = scanHistory.map(h => {
+    const badgeClass = String(h.result || '').toLowerCase();
+    return `
+      <div class="history-item">
+        <span class="history-badge ${badgeClass}">${h.result}</span>
+        <span class="history-id">${escapeHtml(h.memberId)}</span>
+        <span class="history-time">${h.time}</span>
+      </div>
+    `;
   }).join('');
 }
 
-function showLoading(v) { document.getElementById('loading').classList.toggle('show', v); }
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
 
-function playBeep(type) {
+function showLoading(show) {
+  document.getElementById('loading-overlay').classList.toggle('show', show);
+}
+
+function playBeep(isOK) {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
     osc.type = 'sine';
-    if (type === 'detect') {
-      osc.frequency.value = 600;
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-      osc.start(); osc.stop(ctx.currentTime + 0.08);
-    } else if (type === 'ok') {
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.start(); osc.stop(ctx.currentTime + 0.3);
-    } else {
-      osc.frequency.value = 220;
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-      osc.start(); osc.stop(ctx.currentTime + 0.6);
-    }
-  } catch(e) {}
+    osc.frequency.value = isOK ? 880 : 220;
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (isOK ? 0.22 : 0.35));
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + (isOK ? 0.22 : 0.35));
+  } catch (e) {}
 }
 </script>
 </body>
