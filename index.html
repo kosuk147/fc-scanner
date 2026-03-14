@@ -4,10 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>FC入場スキャナー</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<!-- ZXing: QR＋バーコード両対応 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/index.min.js"></script>
 <style>
-  /* ===== RESET & BASE ===== */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
@@ -25,344 +24,92 @@
     --ng-glow: rgba(239,68,68,0.35);
     --text: #e2e0f0;
     --muted: #7070a0;
-    --font-head: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif;
+    --font: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif;
   }
 
-  html, body {
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-head);
-    overflow: hidden;
-  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
+  #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; }
 
-  /* ===== LAYOUT ===== */
-  #app {
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-    max-width: 480px;
-    margin: 0 auto;
-    position: relative;
-  }
-
-  /* ===== HEADER ===== */
-  header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-    position: relative;
-    z-index: 10;
-  }
-  .logo-mark {
-    width: 32px; height: 32px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
-    flex-shrink: 0;
-  }
-  .header-title { font-size: 15px; font-weight: 700; letter-spacing: 0.03em; }
+  /* HEADER */
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .logo { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .header-title { font-size: 15px; font-weight: 700; }
   .header-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-    margin-left: auto;
-    flex-shrink: 0;
-    transition: background 0.3s;
-  }
-  .status-dot.ready { background: var(--ok); box-shadow: 0 0 6px var(--ok); animation: pulse-dot 2s infinite; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-left: auto; flex-shrink: 0; transition: background 0.3s; }
+  .status-dot.ready { background: var(--ok); box-shadow: 0 0 6px var(--ok); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  /* ===== SETUP SCREEN ===== */
-  #setup-screen {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px 16px;
-  }
-
-  .setup-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
-  }
-  .setup-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--muted);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-  .setup-input {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: var(--font-head);
-    font-size: 14px;
-    padding: 10px 12px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
+  /* SETUP */
+  #setup-screen { flex: 1; overflow-y: auto; padding: 20px 16px; }
+  .setup-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  .setup-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  .setup-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font); font-size: 14px; padding: 10px 12px; outline: none; transition: border-color 0.2s; }
   .setup-input:focus { border-color: var(--accent); }
   .setup-input::placeholder { color: var(--muted); }
-
-  .gas-hint {
-    font-size: 11px;
-    color: var(--muted);
-    margin-top: 6px;
-    line-height: 1.5;
-  }
-
-  .start-btn {
-    width: 100%;
-    padding: 16px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border: none;
-    border-radius: 12px;
-    color: #fff;
-    font-family: var(--font-head);
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    margin-top: 8px;
-    transition: opacity 0.2s, transform 0.1s;
-  }
+  .gas-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .start-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 12px; color: #fff; font-family: var(--font); font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: opacity 0.2s, transform 0.1s; }
   .start-btn:active { opacity: 0.85; transform: scale(0.98); }
 
-  /* ===== SCANNER SCREEN ===== */
+  /* SCANNER */
   #scanner-screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .camera-wrap { position: relative; flex-shrink: 0; background: #000; overflow: hidden; }
+  #video { width: 100%; display: block; max-height: 55vw; object-fit: cover; }
 
-  /* Camera area */
-  .camera-wrap {
-    position: relative;
-    flex-shrink: 0;
-    background: #000;
-    overflow: hidden;
-  }
-  #video {
-    width: 100%;
-    display: block;
-    max-height: 55vw;
-    object-fit: cover;
-  }
-  #canvas-hidden { display: none; }
+  .scan-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .scan-frame { width: 200px; height: 130px; position: relative; }
+  .scan-frame::before, .scan-frame::after, .scan-frame span::before, .scan-frame span::after { content: ''; position: absolute; width: 24px; height: 24px; border-color: var(--accent2); border-style: solid; }
+  .scan-frame::before  { top:0; left:0; border-width:3px 0 0 3px; border-radius:4px 0 0 0; }
+  .scan-frame::after   { top:0; right:0; border-width:3px 3px 0 0; border-radius:0 4px 0 0; }
+  .scan-frame span::before { bottom:0; left:0; border-width:0 0 3px 3px; border-radius:0 0 0 4px; }
+  .scan-frame span::after  { bottom:0; right:0; border-width:0 3px 3px 0; border-radius:0 0 4px 0; }
+  .scan-line { position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: sweep 2s ease-in-out infinite; box-shadow: 0 0 8px var(--accent); }
+  @keyframes sweep { 0%{top:5%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:95%;opacity:0} }
 
-  /* Scan frame overlay */
-  .scan-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-  }
-  .scan-frame {
-    width: 180px;
-    height: 180px;
-    position: relative;
-  }
-  .scan-frame::before, .scan-frame::after,
-  .scan-frame span::before, .scan-frame span::after {
-    content: '';
-    position: absolute;
-    width: 28px; height: 28px;
-    border-color: var(--accent2);
-    border-style: solid;
-  }
-  .scan-frame::before  { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
-  .scan-frame::after   { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
-  .scan-frame span::before { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
-  .scan-frame span::after  { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
-  .scan-line {
-    position: absolute;
-    width: 100%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    animation: scan-sweep 2s ease-in-out infinite;
-    box-shadow: 0 0 8px var(--accent);
-  }
-  @keyframes scan-sweep {
-    0%   { top: 10%; opacity: 0; }
-    10%  { opacity: 1; }
-    90%  { opacity: 1; }
-    100% { top: 90%; opacity: 0; }
-  }
-
-  /* Result area */
-  .result-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-  }
-
-  /* Big result banner */
-  .result-banner {
-    padding: 20px 16px 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    transition: background 0.3s, box-shadow 0.3s;
-    min-height: 120px;
-    justify-content: center;
-  }
+  /* RESULT */
+  .result-area { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+  .result-banner { padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 130px; justify-content: center; transition: background 0.3s; }
   .result-banner.idle { background: var(--surface2); }
-  .result-banner.ok-state {
-    background: var(--ok-bg);
-    box-shadow: inset 0 -2px 24px var(--ok-glow);
-    animation: flash-ok 0.4s ease;
-  }
-  .result-banner.ng-state {
-    background: var(--ng-bg);
-    box-shadow: inset 0 -2px 24px var(--ng-glow);
-    animation: flash-ng 0.4s ease;
-  }
-  @keyframes flash-ok {
-    0% { background: #fff; }
-    100% { background: var(--ok-bg); }
-  }
-  @keyframes flash-ng {
-    0% { background: #fff; }
-    100% { background: var(--ng-bg); }
-  }
+  .result-banner.ok-state { background: var(--ok-bg); box-shadow: inset 0 -2px 24px var(--ok-glow); animation: flash 0.35s ease; }
+  .result-banner.ng-state { background: var(--ng-bg); box-shadow: inset 0 -2px 24px var(--ng-glow); animation: flash 0.35s ease; }
+  @keyframes flash { 0%{filter:brightness(3)} 100%{filter:brightness(1)} }
+  .result-icon { font-size: 44px; line-height: 1; }
+  .result-verdict { font-size: 36px; font-weight: 900; letter-spacing: 0.06em; }
+  .result-verdict.ok { color: var(--ok); text-shadow: 0 0 20px var(--ok-glow); }
+  .result-verdict.ng { color: var(--ng); text-shadow: 0 0 20px var(--ng-glow); }
+  .result-verdict.idle { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .result-member-id { font-size: 17px; font-weight: 700; word-break: break-all; text-align: center; }
+  .result-message { font-size: 13px; color: var(--muted); text-align: center; }
 
-  .result-icon { font-size: 48px; line-height: 1; }
-  .result-verdict {
-    font-size: 32px;
-    font-weight: 900;
-    letter-spacing: 0.06em;
-  }
-  .result-verdict.ok { color: var(--ok); text-shadow: 0 0 16px var(--ok-glow); }
-  .result-verdict.ng { color: var(--ng); text-shadow: 0 0 16px var(--ng-glow); }
-  .result-verdict.idle { color: var(--muted); font-size: 14px; font-weight: 400; letter-spacing: 0.02em; }
+  /* HISTORY */
+  .history-section { padding: 12px 16px; flex: 1; }
+  .history-title { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  .history-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 6px; animation: slide-in 0.25s ease; }
+  @keyframes slide-in { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+  .badge { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
+  .badge.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+  .badge.ng { background: var(--ng-bg); color: var(--ng); border: 1px solid var(--ng); }
+  .badge.sent { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .h-id { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .h-time { color: var(--muted); flex-shrink: 0; }
 
-  .result-member-id {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-    letter-spacing: 0.04em;
-    word-break: break-all;
-    text-align: center;
-  }
-  .result-message {
-    font-size: 13px;
-    color: var(--muted);
-    text-align: center;
-  }
-
-  /* History list */
-  .history-section {
-    padding: 12px 16px;
-    flex: 1;
-  }
-  .history-title {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--muted);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-  .history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .history-item {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 9px 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    animation: slide-in 0.25s ease;
-  }
-  @keyframes slide-in {
-    from { opacity: 0; transform: translateY(-8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .history-badge {
-    font-size: 11px;
-    font-weight: 800;
-    padding: 2px 8px;
-    border-radius: 4px;
-    flex-shrink: 0;
-    letter-spacing: 0.05em;
-  }
-  .history-badge.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
-  .history-badge.ng { background: var(--ng-bg); color: var(--ng); border: 1px solid var(--ng); }
-  .history-id { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .history-time { color: var(--muted); flex-shrink: 0; }
-
-  /* Bottom bar */
-  .bottom-bar {
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-  }
+  /* BOTTOM */
+  .bottom-bar { background: var(--surface); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   .bottom-info { font-size: 11px; color: var(--muted); }
   .bottom-info strong { color: var(--text); }
-  .settings-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--muted);
-    font-family: var(--font-head);
-    font-size: 12px;
-    padding: 6px 12px;
-    cursor: pointer;
-  }
+  .settings-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-family: var(--font); font-size: 12px; padding: 6px 12px; cursor: pointer; }
 
-  /* Loading overlay */
-  #loading-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(10,10,18,0.8);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 12px;
-  }
-  #loading-overlay.show { display: flex; }
-  .spinner {
-    width: 36px; height: 36px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  /* LOADING */
+  #loading { display: none; position: fixed; inset: 0; background: rgba(10,10,18,0.8); z-index: 100; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+  #loading.show { display: flex; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
   .loading-text { font-size: 14px; color: var(--muted); }
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="logo-mark">🎫</div>
+    <div class="logo">🎫</div>
     <div>
       <div class="header-title">FC入場スキャナー</div>
       <div class="header-sub" id="header-sub">設定してください</div>
@@ -374,8 +121,7 @@
   <div id="setup-screen">
     <div class="setup-section">
       <div class="setup-label">GAS WebアプリURL <span style="color:#ef4444">*必須</span></div>
-      <input class="setup-input" type="url" id="gas-url"
-        placeholder="https://script.google.com/macros/s/..." />
+      <input class="setup-input" type="url" id="gas-url" placeholder="https://script.google.com/macros/s/..." />
       <div class="gas-hint">GASをデプロイして取得したURLを貼り付けてください</div>
     </div>
     <div class="setup-section">
@@ -384,221 +130,172 @@
     </div>
     <div class="setup-section">
       <div class="setup-label">イベント名（任意）</div>
-      <input class="setup-input" type="text" id="event-name" placeholder="例：2024年春イベント" />
+      <input class="setup-input" type="text" id="event-name" placeholder="例：2025年春イベント" />
     </div>
-    <button class="start-btn" id="start-btn" onclick="startScanner()">
-      📷 スキャン開始
-    </button>
+    <button class="start-btn" onclick="startScanner()">📷 スキャン開始</button>
   </div>
 
   <!-- SCANNER SCREEN -->
   <div id="scanner-screen">
     <div class="camera-wrap">
       <video id="video" autoplay playsinline muted></video>
-      <canvas id="canvas-hidden"></canvas>
       <div class="scan-overlay">
-        <div class="scan-frame">
-          <span></span>
-          <div class="scan-line"></div>
-        </div>
+        <div class="scan-frame"><span></span><div class="scan-line"></div></div>
       </div>
     </div>
-
     <div class="result-area">
       <div class="result-banner idle" id="result-banner">
         <div class="result-icon" id="result-icon">📷</div>
         <div class="result-verdict idle" id="result-verdict">会員証をかざしてください</div>
         <div class="result-member-id" id="result-member-id"></div>
-        <div class="result-message" id="result-message"></div>
+        <div class="result-message" id="result-msg"></div>
       </div>
-
       <div class="history-section">
         <div class="history-title">📋 本日のスキャン履歴</div>
-        <div class="history-list" id="history-list">
-          <div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">
-            まだスキャンがありません
-          </div>
+        <div id="history-list">
+          <div style="font-size:12px;color:var(--muted);text-align:center;padding:12px 0">まだスキャンがありません</div>
         </div>
       </div>
     </div>
-
     <div class="bottom-bar">
-      <div class="bottom-info">
-        スタッフ: <strong id="display-staff">-</strong> ／
-        イベント: <strong id="display-event">-</strong>
-      </div>
-      <button class="settings-btn" onclick="goToSetup()">⚙ 設定</button>
+      <div class="bottom-info">スタッフ: <strong id="disp-staff">-</strong> ／ イベント: <strong id="disp-event">-</strong></div>
+      <button class="settings-btn" onclick="goSetup()">⚙ 設定</button>
     </div>
   </div>
 </div>
 
-<div id="loading-overlay">
-  <div class="spinner"></div>
-  <div class="loading-text">送信中...</div>
-</div>
+<div id="loading"><div class="spinner"></div><div class="loading-text">送信中...</div></div>
 
 <script>
-// ============================================================
-// CONFIG
-// ============================================================
-let GAS_URL = '';
-let STAFF_NAME = '';
-let EVENT_NAME = '';
-let scanning = true;
+let GAS_URL = '', STAFF = '', EVENT = '';
 let cooldown = false;
-let stream = null;
+let codeReader = null;
 let scanHistory = [];
-let animFrame = null;
 
 // ============================================================
-// SETUP → SCANNER 遷移
+// SETUP → SCANNER
 // ============================================================
 async function startScanner() {
-  const url   = document.getElementById('gas-url').value.trim();
-  const staff = document.getElementById('staff-name').value.trim();
-  const event = document.getElementById('event-name').value.trim();
-
+  const url = document.getElementById('gas-url').value.trim();
   if (!url) { alert('GAS WebアプリURLを入力してください'); return; }
 
-  GAS_URL    = url;
-  STAFF_NAME = staff || 'スタッフ';
-  EVENT_NAME = event || 'イベント';
+  GAS_URL = url;
+  STAFF   = document.getElementById('staff-name').value.trim() || 'スタッフ';
+  EVENT   = document.getElementById('event-name').value.trim() || 'イベント';
 
-  // Save to localStorage
-  localStorage.setItem('fc_gas_url',    GAS_URL);
-  localStorage.setItem('fc_staff_name', STAFF_NAME);
-  localStorage.setItem('fc_event_name', EVENT_NAME);
+  localStorage.setItem('fc_url',   GAS_URL);
+  localStorage.setItem('fc_staff', STAFF);
+  localStorage.setItem('fc_event', EVENT);
 
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-    });
-    const video = document.getElementById('video');
-    video.srcObject = stream;
-    video.play();
-    video.onloadedmetadata = () => {
-      document.getElementById('setup-screen').style.display = 'none';
-      const ss = document.getElementById('scanner-screen');
-      ss.style.display = 'flex';
-      document.getElementById('header-sub').textContent = EVENT_NAME;
-      document.getElementById('display-staff').textContent = STAFF_NAME;
-      document.getElementById('display-event').textContent = EVENT_NAME;
-      document.getElementById('status-dot').classList.add('ready');
-      requestAnimationFrame(scanLoop);
-    };
-  } catch(err) {
-    alert('カメラへのアクセスが許可されていません。\nブラウザの設定でカメラを許可してください。');
-  }
+  document.getElementById('header-sub').textContent  = EVENT;
+  document.getElementById('disp-staff').textContent  = STAFF;
+  document.getElementById('disp-event').textContent  = EVENT;
+  document.getElementById('setup-screen').style.display  = 'none';
+  document.getElementById('scanner-screen').style.display = 'flex';
+  document.getElementById('status-dot').classList.add('ready');
+
+  initZXing();
 }
 
-function goToSetup() {
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  cancelAnimationFrame(animFrame);
+function goSetup() {
+  if (codeReader) { try { codeReader.reset(); } catch(e){} codeReader = null; }
   document.getElementById('scanner-screen').style.display = 'none';
-  document.getElementById('setup-screen').style.display = 'block';
+  document.getElementById('setup-screen').style.display   = 'block';
   document.getElementById('status-dot').classList.remove('ready');
 }
 
-// Restore saved settings
 window.addEventListener('DOMContentLoaded', () => {
-  const savedUrl   = localStorage.getItem('fc_gas_url');
-  const savedStaff = localStorage.getItem('fc_staff_name');
-  const savedEvent = localStorage.getItem('fc_event_name');
-  if (savedUrl)   document.getElementById('gas-url').value   = savedUrl;
-  if (savedStaff) document.getElementById('staff-name').value = savedStaff;
-  if (savedEvent) document.getElementById('event-name').value = savedEvent;
+  const u = localStorage.getItem('fc_url');
+  const s = localStorage.getItem('fc_staff');
+  const e = localStorage.getItem('fc_event');
+  if (u) document.getElementById('gas-url').value    = u;
+  if (s) document.getElementById('staff-name').value = s;
+  if (e) document.getElementById('event-name').value = e;
 });
 
 // ============================================================
-// QR SCAN LOOP (jsQR)
+// ZXing（QR＋バーコード全対応）
 // ============================================================
-function scanLoop() {
-  animFrame = requestAnimationFrame(scanLoop);
-  if (!scanning || cooldown) return;
-
-  const video  = document.getElementById('video');
-  const canvas = document.getElementById('canvas-hidden');
-  if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
-
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const code = jsQR(imageData.data, imageData.width, imageData.height, {
-    inversionAttempts: 'dontInvert'
-  });
-
-  if (code && code.data) {
-    handleScan(code.data);
+function initZXing() {
+  if (typeof ZXing === 'undefined') {
+    alert('スキャンライブラリの読み込みに失敗しました。\nページを再読み込みしてください。');
+    goSetup();
+    return;
   }
+
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    ZXing.BarcodeFormat.QR_CODE,
+    ZXing.BarcodeFormat.EAN_13,
+    ZXing.BarcodeFormat.EAN_8,
+    ZXing.BarcodeFormat.CODE_128,
+    ZXing.BarcodeFormat.CODE_39,
+    ZXing.BarcodeFormat.CODE_93,
+    ZXing.BarcodeFormat.ITF,
+    ZXing.BarcodeFormat.DATA_MATRIX,
+    ZXing.BarcodeFormat.PDF_417,
+    ZXing.BarcodeFormat.AZTEC,
+    ZXing.BarcodeFormat.UPC_A,
+    ZXing.BarcodeFormat.UPC_E,
+  ]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+  codeReader = new ZXing.BrowserMultiFormatReader(hints, 200);
+
+  codeReader.decodeFromConstraints(
+    {
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    },
+    'video',
+    (result, err) => {
+      if (result && !cooldown) {
+        handleScan(result.getText());
+      }
+      // errはスキャン中は毎フレーム発生するため無視
+    }
+  ).catch(err => {
+    console.error('Camera error:', err);
+    alert('カメラへのアクセスが許可されていません。\nブラウザの設定でカメラを許可してください。');
+    goSetup();
+  });
 }
 
 // ============================================================
-// HANDLE SCAN
+// スキャン → GAS送信
 // ============================================================
 async function handleScan(memberId) {
   if (cooldown) return;
   cooldown = true;
-
-  // UI: loading
+  playBeep('detect');
   showLoading(true);
 
+  const body = JSON.stringify({ memberId, staffName: STAFF, eventName: EVENT });
+
   try {
+    // まずCORSで試みる
     const res = await fetch(GAS_URL, {
       method: 'POST',
-      mode: 'no-cors', // GASはCORSを返せないためno-cors
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ memberId, staffName: STAFF_NAME, eventName: EVENT_NAME })
+      headers: { 'Content-Type': 'text/plain' },
+      body
     });
-
-    // no-corsの場合はレスポンスが読めないため、別途GETで確認するか
-    // GASのdoPostをJSONPで返す方式にする
-    // ここではno-cors用のフォールバック処理
-    showResult('SENT', memberId, '送信完了 — スプレッドシートを確認してください');
-    addHistory('OK', memberId);
-
-  } catch(err) {
-    showResult('ERROR', memberId, 'エラー: ' + err.message);
-  } finally {
-    showLoading(false);
-    // 3秒後に次のスキャンを許可
-    setTimeout(() => {
-      cooldown = false;
-      resetResult();
-    }, 3000);
-  }
-}
-
-// ============================================================
-// GAS JSONP方式（CORS対応）
-// ============================================================
-async function handleScanCORS(memberId) {
-  if (cooldown) return;
-  cooldown = true;
-  showLoading(true);
-
-  try {
-    const payload = { memberId, staffName: STAFF_NAME, eventName: EVENT_NAME };
-    const response = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' }, // GAS workaround
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json();
-
-    const isOK = data.result === 'OK';
+    const data = await res.json();
     showResult(data.result, memberId, data.message || '');
     addHistory(data.result, memberId);
-
-    // 効果音（Web Audio API）
-    playBeep(isOK);
-
-  } catch(err) {
-    // no-corsフォールバック
-    await handleScan(memberId);
-    return;
+    playBeep(data.result === 'OK' ? 'ok' : 'ng');
+  } catch(e) {
+    // no-corsフォールバック（GASのCORS制限対応）
+    try {
+      await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body });
+      showResult('SENT', memberId, '送信完了 — スプレッドシートで結果を確認');
+      addHistory('SENT', memberId);
+      playBeep('ok');
+    } catch(e2) {
+      showResult('ERROR', memberId, '通信エラー。URLを確認してください');
+    }
   } finally {
     showLoading(false);
     setTimeout(() => { cooldown = false; resetResult(); }, 3000);
@@ -606,108 +303,81 @@ async function handleScanCORS(memberId) {
 }
 
 // ============================================================
-// UI HELPERS
+// UI ヘルパー
 // ============================================================
 function showResult(result, memberId, message) {
   const banner  = document.getElementById('result-banner');
   const icon    = document.getElementById('result-icon');
   const verdict = document.getElementById('result-verdict');
-  const idEl    = document.getElementById('result-member-id');
-  const msgEl   = document.getElementById('result-message');
-
   banner.className = 'result-banner';
 
   if (result === 'OK') {
     banner.classList.add('ok-state');
-    icon.textContent = '✅';
-    verdict.className = 'result-verdict ok';
-    verdict.textContent = 'OK';
+    icon.textContent = '✅'; verdict.className = 'result-verdict ok'; verdict.textContent = 'OK';
   } else if (result === 'NG') {
     banner.classList.add('ng-state');
-    icon.textContent = '🚫';
-    verdict.className = 'result-verdict ng';
-    verdict.textContent = 'NG';
+    icon.textContent = '🚫'; verdict.className = 'result-verdict ng'; verdict.textContent = 'NG';
   } else {
     banner.classList.add('idle');
-    icon.textContent = '📤';
+    icon.textContent = result === 'SENT' ? '📤' : '⚠️';
     verdict.className = 'result-verdict idle';
     verdict.textContent = result === 'SENT' ? '送信完了' : 'エラー';
   }
-
-  idEl.textContent  = memberId ? `会員ID: ${memberId}` : '';
-  msgEl.textContent = message;
+  document.getElementById('result-member-id').textContent = memberId ? `会員ID: ${memberId}` : '';
+  document.getElementById('result-msg').textContent = message;
 }
 
 function resetResult() {
-  const banner  = document.getElementById('result-banner');
-  banner.className = 'result-banner idle';
+  document.getElementById('result-banner').className = 'result-banner idle';
   document.getElementById('result-icon').textContent = '📷';
   const v = document.getElementById('result-verdict');
-  v.className = 'result-verdict idle';
-  v.textContent = '会員証をかざしてください';
+  v.className = 'result-verdict idle'; v.textContent = '会員証をかざしてください';
   document.getElementById('result-member-id').textContent = '';
-  document.getElementById('result-message').textContent = '';
+  document.getElementById('result-msg').textContent = '';
 }
 
 function addHistory(result, memberId) {
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-  scanHistory.unshift({ result, memberId, time: timeStr });
+  const time = new Date().toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  scanHistory.unshift({ result, memberId, time });
   if (scanHistory.length > 20) scanHistory.pop();
-
-  const list = document.getElementById('history-list');
-  list.innerHTML = scanHistory.map(h => `
-    <div class="history-item">
-      <span class="history-badge ${h.result.toLowerCase()}">${h.result}</span>
-      <span class="history-id">${h.memberId}</span>
-      <span class="history-time">${h.time}</span>
-    </div>
-  `).join('');
+  const cls = result === 'NG' ? 'ng' : result === 'SENT' ? 'sent' : 'ok';
+  document.getElementById('history-list').innerHTML = scanHistory.map(h => {
+    const c = h.result === 'NG' ? 'ng' : h.result === 'SENT' ? 'sent' : 'ok';
+    return `<div class="history-item">
+      <span class="badge ${c}">${h.result}</span>
+      <span class="h-id">${h.memberId}</span>
+      <span class="h-time">${h.time}</span>
+    </div>`;
+  }).join('');
 }
 
-function showLoading(show) {
-  document.getElementById('loading-overlay').classList.toggle('show', show);
-}
+function showLoading(v) { document.getElementById('loading').classList.toggle('show', v); }
 
-// ============================================================
-// BEEP SOUND
-// ============================================================
-function playBeep(isOK) {
+function playBeep(type) {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(ctx.destination);
     osc.type = 'sine';
-    osc.frequency.value = isOK ? 880 : 220;
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (isOK ? 0.3 : 0.5));
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + (isOK ? 0.3 : 0.5));
+    if (type === 'detect') {
+      osc.frequency.value = 600;
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+      osc.start(); osc.stop(ctx.currentTime + 0.08);
+    } else if (type === 'ok') {
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(); osc.stop(ctx.currentTime + 0.3);
+    } else {
+      osc.frequency.value = 220;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.start(); osc.stop(ctx.currentTime + 0.6);
+    }
   } catch(e) {}
 }
-
-// ============================================================
-// AUTO-DETECT: CORSが通るならCORS版、ダメならno-cors版を使う
-// スキャン時に自動切替
-// ============================================================
-let useCORS = true;
-async function detectMode() {
-  try {
-    const r = await fetch(GAS_URL, { method: 'GET', mode: 'cors' });
-    if (r.ok) { useCORS = true; return; }
-  } catch(e) {}
-  useCORS = false;
-}
-
-// Override handleScan to use CORS version when possible
-const _origScan = handleScan;
-window.handleScan = async function(memberId) {
-  if (cooldown) return;
-  await handleScanCORS(memberId);
-};
 </script>
 </body>
 </html>
